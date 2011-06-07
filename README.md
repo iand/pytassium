@@ -29,9 +29,12 @@ The basic pattern of usage is as follows:
 
 ```python
 import pytassium
+import time
 dataset = pytassium.Dataset('nasa','put-your-api-key-here')
 
+# --------------------------
 # Use the lookup API
+# --------------------------
 response, data = dataset.lookup('http://data.kasabi.com/dataset/nasa/person/eugeneandrewcernan')
 if response.status in range(200,300):
   # data now contains an rdflib.Graph
@@ -39,7 +42,9 @@ if response.status in range(200,300):
 else:
   print "Oh no! %d %s - %s" % (response.status, response.reason, body)
 
+# --------------------------
 # Use the sparql API
+# --------------------------
 response, data = dataset.select('select ?s where {?s a <http://xmlns.com/foaf/0.1/Person>} limit 10')
 if response.status in range(200,300):
   # data now contains a dictionary of results
@@ -47,26 +52,46 @@ if response.status in range(200,300):
 else:
   print "Oh no! %d %s - %s" % (response.status, response.reason, body)
 
+# --------------------------
 # Use the attribution API
+# --------------------------
 response, data = dataset.attribution()
 # assuming success, data now contains dictionary
 print data['homepage']
 
-# Use the reconciliation API
+# --------------------------
+# Use the search API
+# --------------------------
+# search for 5 results matching apollo
+response, data = dataset.search("apollo", 5)
+for result in data['results']:
+  print "%s (score: %s)" % (result['title'], result['score'])
 
+# facet on a search for alan, with the name and type fields
+fields = ['name', 'type']
+query = "alan"
+response, data = dataset.facet(query, fields)
+for facet in data['fields']:
+  print "Top %ss matching %s" % (facet['name'],query)
+  for term in facet['terms']:
+    print "%s (%s results)" % (term['value'], term['number'])
+
+
+# --------------------------
+# Use the reconciliation API
+# --------------------------
 # Reconcile one label
-response, data = d.reconcile('Alan Shepard')
+response, data = dataset.reconcile('Alan Shepard')
 print "Best match is: %s" % data['result'][0]['id']
 
 # Reconcile a list of labels
 labels = ['Neil Armstrong','alan shepard']
-response, data = d.reconcile(labels)
+response, data = dataset.reconcile(labels)
 for i in range(0, len(labels)):
   print "Best match for %s is: %s" % (labels[i], data['q%s'%i]['result'][0]['id'])
 
-
 # Reconcile a label with specific parameters
-response, data = d.reconcile('Apollo 11', limit=3, type='http://purl.org/net/schemas/space/Mission', type_strict ='any')
+response, data = dataset.reconcile('Apollo 11', limit=3, type='http://purl.org/net/schemas/space/Mission', type_strict ='any')
 print "Best match is: %s" % data['result'][0]['id']
 
 # Reconcile with a specific query
@@ -76,10 +101,12 @@ query = {
     "type" : "http://purl.org/net/schemas/space/Mission",
     "type_strict" : "any",
 }
-response, data = d.reconcile(query)
+response, data = dataset.reconcile(query)
 print "Best match is: %s" % data['result'][0]['id']
 
+# --------------------------
 # Use the update API
+# --------------------------
 dataset = pytassium.Dataset('my-writable-dataset','put-your-api-key-here')
 
 # Store the contents of a turtle file
@@ -88,16 +115,37 @@ dataset.store_file('/tmp/mydata.ttl', media_type='text/turtle')
 # Store data from a string
 mytriples = "<http://example.com/foo> a <http://example.com/Cat> ."
 dataset.store_data(mytriples, media_type='text/turtle') 
+
+# --------------------------
+# Use the jobs API
+# --------------------------
+response, job_uri = dataset.schedule_reset()
+print "Reset scheduled, URI is: %s" % job_uri
+print "Waiting for reset to complete"
+done = False
+while not done:
+  response, data = dataset.job_status(job_uri)
+  if response.status in range(200,300):
+    if data['status'] == 'scheduled':
+      print "Reset has not started yet"
+    elif data['status'] == 'running':
+      print "Reset is in progress"
+    elif data['status'] == 'failed':
+      print "Reset has failed :("
+      done = True
+    elif data['status'] == 'succeeded':
+      print "Reset has completed :)"
+      done = True
+
+  if not done:
+    time.sleep(5)
 ```
 
 To-do
 -----
 The following APIs are not yet implemented:
 
-* Search
 * Augmentation
-* Reconciliation
-* Jobs
 
 Related Projects
 ----------------

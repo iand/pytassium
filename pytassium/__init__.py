@@ -19,6 +19,7 @@ import datetime as dt
 import StringIO
 import xml.etree.ElementTree as et
 import time
+import datetime as dt
 from rdfchangesets import ChangeSet, BatchChangeSet
 import json
 import re
@@ -223,14 +224,60 @@ class ReconciliationApi(KasabiApi):
       
     return pfilter
 
+class SearchApi(KasabiApi):
+  def search(self, query, max=None, offset=None, sort=None, raw=False):
+    params = [ "query=%s" % urllib.quote_plus(query)]
+    if max:
+      params.append("max=%s"%urllib.quote_plus(str(max)))
+    if offset:
+      params.append("offset=%s"%urllib.quote_plus(str(offset)))
+    if sort:
+      params.append("sort=%s"%urllib.quote_plus(sort))
+    
+    response, body = self.client.request("%s?%s" % (self.uri, "&".join(params)), "GET", headers={"accept" : "application/json", APIKEY_HEADER:self.apikey})
+    if raw or response.status not in range(200, 300):
+      return response, body
+    else:
+      data = json.loads(body)
+      return response, data
+
+  def facet(self, query, fields, raw=False):
+    if isinstance(fields, basestring):
+      fields = [fields]
+    response, body = self.client.request("%s/facet?query=%s&fields=%s" % (self.uri, urllib.quote_plus(query), ",".join(fields)), "GET", headers={"accept" : "application/json", APIKEY_HEADER:self.apikey})
+    if raw or response.status not in range(200, 300):
+      return response, body
+    else:
+      data = json.loads(body)
+      return response, data
+
+class JobsApi(KasabiApi):
+  def schedule_job(self, type, time = None, raw=False):
+    if time is None:
+      time = dt.datetime.utcnow()
+
+    data = { 'jobType':type, 'startTime': time.strftime('%Y-%m-%dT%H:%M:%SZ') }
+    response, body = self.client.request(self.uri, "POST",body=json.dumps(data), headers={"accept" : "*/*", 'content-type':'application/json', APIKEY_HEADER:self.apikey})
+    if raw or response.status not in range(200, 300):
+      return response, body
+    else:
+      data = response['location']
+      return response, data
+
+  def schedule_reset(self, time=None, raw=False):
+    return self.schedule_job('reset', time, raw)
+    
+  def status(self, job_uri, raw=False):
+    response, body = self.client.request(job_uri, "GET", headers={"accept" : "application/json", APIKEY_HEADER:self.apikey})
+    if raw or response.status not in range(200, 300):
+      return response, body
+    else:
+      data = json.loads(body)
+      return response, data
+
 class AugmentationApi(KasabiApi):
   pass
 
-class SearchApi(KasabiApi):
-  pass
-
-class JobsApi(KasabiApi):
-  pass
   
   
 class Dataset:
@@ -338,12 +385,31 @@ class Dataset:
       raise PytassiumError("Dataset does not have a reconciliation api")
     return api.reconcile(query,raw)
 
-  def reconcile_label(self, label, raw=False):
-    api = self.get_api('reconciliation')
-    if not api:
-      raise PytassiumError("Dataset does not have a reconciliation api")
-    return api.reconcile_label(label,raw)
 
+  def search(self, query, max=None, offset=None, sort=None, raw=False):
+    api = self.get_api('search')
+    if not api:
+      raise PytassiumError("Dataset does not have a search api")
+    return api.search(query,max, offset, sort, raw)
+
+  def facet(self, query, fields, raw=False):
+    api = self.get_api('search')
+    if not api:
+      raise PytassiumError("Dataset does not have a search api")
+    return api.facet(query, fields, raw)
+
+  def schedule_reset(self, time=None, raw=False):
+    api = self.get_api('jobs')
+    if not api:
+      raise PytassiumError("Dataset does not have a jobs api")
+    return api.schedule_reset(time,raw)
+
+  def job_status(self, job_uri, raw=False):
+    api = self.get_api('jobs')
+    if not api:
+      raise PytassiumError("Dataset does not have a jobs api")
+    return api.status(job_uri,raw)
+    
   def fetch_meta(self):
     response, body = self.client.request("%s.ttl"%self.uri, "GET",headers={"accept" : "text/turtle", APIKEY_HEADER:self.apikey})
     response, self.meta = response_body_as_graph(response, body, format="n3")
