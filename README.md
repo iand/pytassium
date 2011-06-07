@@ -6,6 +6,9 @@ Overview
 --------
 This is a library for working with APIs provided by [Kasabi](http://www.kasabi.com/)
 
+Homepage: http://github.com/iand/pytassium
+Pypi: http://pypi.python.org/pypi/pytassium
+
 Installing
 ----------
 Install with easy_install:
@@ -15,6 +18,8 @@ Install with easy_install:
 If you already have it installed then simply upgrade with:
 
     >sudo easy_install --upgrade pytassium
+
+
 
 Author
 ------
