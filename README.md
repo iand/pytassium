@@ -72,6 +72,12 @@ The following APIs are not yet implemented:
 * Reconciliation
 * Jobs
 
+Related Projects
+----------------
+If Python's not your thing, you may also be interested in:
+
+* [kasabi.rb](https://github.com/kasabi/kasabi.rb) - Ruby
+* [potassium](https://github.com/iand/potassium) - PHP
 
 Author
 ------
