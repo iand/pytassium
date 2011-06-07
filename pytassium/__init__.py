@@ -74,11 +74,11 @@ class SparqlApi(KasabiApi):
 
   def describe(self, uri, raw = False):
     query = "describe <%s>" % uri
-    (response, body) = self.sparql(query=query, media_type='application/rdf+xml')
+    (response, body) = self.sparql(query=query, media_type='text/turtle')
     if raw or response.status not in range(200, 300):
       return (response, body)
     else:
-      return response_body_as_graph(response, body, format='application/rdf+xml')
+      return response_body_as_graph(response, body, format='text/turtle')
 
   def ask(self, query, raw = False):
     (response, body) = self.sparql(query=query, media_type='application/sparql-results+xml')
