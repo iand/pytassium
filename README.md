@@ -19,6 +19,10 @@ If you already have it installed then simply upgrade with:
 
     >sudo easy_install --upgrade pytassium
 
+pytassium requires the following (should be handled automatically with easy_install):
+
+*   [rdfchangesets](https://github.com/iand/rdfchangesets)
+
 Getting Started
 ---------------
 The basic pattern of usage is as follows:
@@ -61,6 +65,13 @@ The basic pattern of usage is as follows:
 
 To-do
 -----
+The following APIs are not yet implemented:
+
+* Search
+* Augmentation
+* Reconciliation
+* Jobs
+
 
 Author
 ------
