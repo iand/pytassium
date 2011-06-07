@@ -120,10 +120,6 @@ class SparqlApi(KasabiApi):
         results.append(d)
       return response, (headers, results)
     return response, body
-
-
-class SearchApi(KasabiApi):
-  pass
   
 class LookupApi(KasabiApi):
   def lookup(self, uri, raw = False):
@@ -133,10 +129,6 @@ class LookupApi(KasabiApi):
     else:
       return response_body_as_graph(response, body)
 
-class AugmentationApi(KasabiApi):
-  pass
-class ReconciliationApi(KasabiApi):
-  pass
 class UpdateApi(KasabiApi):
   def store_data(self, data, graph_uri=None, media_type='text/turtle'):
     """Store some RDF in a graph associated with this dataset."""    
@@ -181,6 +173,61 @@ class UpdateApi(KasabiApi):
     g = changeset.getGraph()
     data = g.serialize(format='xml')
     return self.client.request(self.uri, "POST", body=data, headers={"accept" : "*/*", 'content-type':'application/vnd.talis.changeset+xml', APIKEY_HEADER:self.apikey})
+
+class ReconciliationApi(KasabiApi):
+  def reconcile(self, query, limit=3, type_strict='any', type=None, properties=None, raw=False):
+    if isinstance(query, basestring):
+      # Assume this is a single label
+      param = "query=%s" % urllib.quote_plus(json.dumps(self.make_query(query, limit=limit, type_strict=type_strict, type=type, properties=properties)))
+    elif isinstance(query, list):
+      # Assume this is an array of labels
+      queries = {}
+      for i in range(0,len(query)):
+        queries['q%s'%i] = self.make_query(query[i], 3, type_strict, type, properties)
+      
+      param = "queries=%s" % urllib.quote_plus(json.dumps(queries))
+    elif isinstance(query, dict):
+      # Assume this is pre-formatted dict according to reconciliation spec
+      if 'query' in query:
+        # Assume its a single query
+        param = "query=%s" % urllib.quote_plus(json.dumps(query))
+      else:
+        # Assume its multiple queries
+        param = "queries=%s" % urllib.quote_plus(json.dumps(query))
+        
+    response, body = self.client.request("%s?%s"%(self.uri, param), "GET",headers={"accept" : "application/json", APIKEY_HEADER:self.apikey})
+    if raw or response.status not in range(200, 300):
+      return response, body
+    else:
+      data = json.loads(body)
+      return response, data
+
+  def make_query(self, label, limit=3, type_strict='any', type=None, properties=None):
+    query = {'query':label, 'limit':limit, 'type_strict':type_strict}
+    if type:
+      query['type'] = type
+    if properties:
+      query['properties'] = properties
+    
+    return query
+
+  def make_property_filter(self, value, name=None, id=None):
+    if not name and not id:
+      raise PytassiumError("Must specify at least a property name or property identifier")
+      
+    pfilter = {'v':value}
+    if name:
+      pfilter['p'] = name
+    if id:
+      pfilter['pid'] = id
+      
+    return pfilter
+
+class AugmentationApi(KasabiApi):
+  pass
+
+class SearchApi(KasabiApi):
+  pass
 
 class JobsApi(KasabiApi):
   pass
@@ -284,6 +331,18 @@ class Dataset:
     if not api:
       raise PytassiumError("Dataset does not have a status api")
     return api.get(raw)
+
+  def reconcile(self, query, limit=3, type_strict='any', type=None, properties=None, raw=False):
+    api = self.get_api('reconciliation')
+    if not api:
+      raise PytassiumError("Dataset does not have a reconciliation api")
+    return api.reconcile(query,raw)
+
+  def reconcile_label(self, label, raw=False):
+    api = self.get_api('reconciliation')
+    if not api:
+      raise PytassiumError("Dataset does not have a reconciliation api")
+    return api.reconcile_label(label,raw)
 
   def fetch_meta(self):
     response, body = self.client.request("%s.ttl"%self.uri, "GET",headers={"accept" : "text/turtle", APIKEY_HEADER:self.apikey})
