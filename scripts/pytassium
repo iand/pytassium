@@ -1,0 +1,653 @@
+#!/usr/bin/env python
+# pyncone
+# This work is hereby released into the Public Domain. 
+#
+# To view a copy of the public domain dedication, visit 
+# [http://creativecommons.org/licenses/publicdomain](http://creativecommons.org/licenses/publicdomain) 
+# or send a letter to Creative Commons, 559 Nathan Abbott Way, Stanford, California 94305, USA.
+
+import os
+import os.path
+import time
+import readline
+import re
+import getpass
+import httplib2
+import rdflib
+from pytassium import Dataset
+from rdfchangesets import ChangeSet, BatchChangeSet
+import traceback
+import StringIO
+import optparse
+import json
+import tempfile
+
+def splitline(line):
+  words = []
+  f = StringIO.StringIO(line)
+  while True:
+    s = f.read(1)
+    if not s:
+      break
+    if s == " ":
+      continue
+    if s in "\"'":
+      stop = s
+    elif s == "<":
+      stop = ">"
+    else:
+      stop = " "
+    while True:
+      c = f.read(1)
+      if not c:
+        break
+      if c == stop:
+        if c != " ":
+          s += c
+        break
+      else:
+        s += c
+    words.append(s)
+  return words
+
+class CommandDispatcher(object):
+  def __init__(self):
+    self.pointer = None
+    self.client = httplib2.Http()
+    self.apikey = None
+    self.dataset_id = None
+    self.dataset = None
+    self.prefixes = {
+      "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+      "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+      "dc": "http://purl.org/dc/elements/1.1/",
+      "dct": "http://purl.org/dc/terms/",
+      "owl": "http://www.w3.org/2002/07/owl#",
+      "cs": "http://purl.org/vocab/changeset/schema#",
+      "foaf": "http://xmlns.com/foaf/0.1/",
+      "geo": "http://www.w3.org/2003/01/geo/wgs84_pos#",
+      "rel": "http://purl.org/vocab/relationship/",
+      "skos": "http://www.w3.org/2004/02/skos/core#",
+      "bibo": "http://purl.org/ontology/bibo/",
+      "ov": "http://open.vocab.org/terms/",
+      "void": "http://rdfs.org/ns/void#",
+      "xsd": "http://www.w3.org/2001/XMLSchema#",
+      "dbp": "http://dbpedia.org/resource/",
+      "dbpo": "http://dbpedia.org/ontology/",
+      "rss": "http://purl.org/rss/1.0/",
+      "geonames": "http://www.geonames.org/ontology/",
+      "dir": "http://schemas.talis.com/2005/dir/schema#",
+    }
+    self.title_props = [
+      "http://www.w3.org/2004/02/skos/core#prefLabel",
+      "http://www.w3.org/2000/01/rdf-schema#label",
+      "http://purl.org/dc/terms/title",
+      "http://purl.org/dc/elements/1.1/title",
+      "http://xmlns.com/foaf/0.1/name",
+      "http://www.geonames.org/ontology/name",
+      "http://www.w3.org/1999/02/22-rdf-syntax-ns#value",
+      "http://purl.org/rss/1.0/title",
+    ]
+    self.uris = []
+    self.return_response = False
+    self.history = []
+
+    prefixes_filename = os.path.join(tempfile.gettempdir(), 'pytassium.prefixes')
+    if os.path.exists(prefixes_filename) and os.path.isfile(prefixes_filename):
+      f = open(prefixes_filename, 'r')
+      body = f.read()
+      f.close()
+    else:
+      try:
+        response, body = self.client.request('http://prefix.cc/popular/all.file.json')
+        if response.status in (200,300):
+          f = open(prefixes_filename, 'w')
+          f.write(body)
+          f.close()
+      except:
+        body = None
+      
+    if body:
+      data = json.loads(body)
+      for prefix in data:
+        if data[prefix]:
+          self.prefixes[prefix] = data[prefix]
+
+  def __call__(self, words, line, add_to_history=True):
+    if words:
+      try:
+        name = "handle_" + words[0].lower()
+        if hasattr(self, name):
+          getattr(self, name)(*words[1:])
+          if add_to_history:
+            self.history.append((words, line))
+      except:
+        traceback.print_exc()
+
+  def execute(self, func, *args, **kwds):
+    while True:
+      response, body = func(*args, **kwds)
+      if response.status in range(200, 300):
+        if self.return_response:
+          return response, body
+        else:
+          return body
+      elif response.status == 401:
+        print "Unauthorized"
+        self.handle_apikey()
+        continue
+      else:
+        print "Request failed: %d %s - %s" % (response.status, response.reason, body)
+        if 'x-talis-response-id' in response:
+          print "x-talis-response-id: %s" % response['x-talis-response-id']
+        return None
+
+  def bind_prefixes(self, g):
+    for prefix, ns in self.prefixes.iteritems():
+      g.bind(prefix, ns)
+
+  def geturi(self, v):
+    if v.isdigit() and int(v) < len(self.uris):
+      return self.uris[int(v)]
+    elif v[0] == "<" and v[-1] == ">":
+      return rdflib.URIRef(v[1:-1])
+    else:
+      prefix, name = v.split(":")
+      return rdflib.URIRef(self.prefixes[prefix] + name)
+
+  def getval(self, v):
+    if v[0] in "\"'":
+      lang = dt = None
+      if v[-1] != v[0]:
+        if "@" in v:
+          v, lang = v.rsplit("@", 1)
+        elif "^^" in v:
+          v, dt = v.rsplit("^^", 1)
+      s = v[1:-1]
+      return rdflib.Literal(s, lang, dt)
+    elif v[:2] == "_:":
+      return rdflib.BNode(v[2:])
+    else:
+      return self.geturi(v)
+
+  def mkval(self, val):
+    if isinstance(val, rdflib.Literal):
+      return repr(val.encode('ascii', 'replace'))
+    elif isinstance(val, rdflib.URIRef):
+      return "<" + val + ">"
+    elif isinstance(val, str):
+      return val
+    else:
+      return "_:" + val
+
+  def gettitle(self, g, obj):
+    for prop in self.title_props:
+      it = g.objects(obj, rdflib.URIRef(prop))
+      try:
+        return it.next().encode('ascii', 'replace')
+      except StopIteration:
+        pass
+    return g.qname(obj)
+
+
+  def handle_use(self, dataset=None):
+    if dataset is None:
+      dataset = raw_input("Dataset: ")
+    self.dataset_id = dataset
+    if self.dataset_id and self.apikey:
+      self.dataset = Dataset(self.dataset_id, self.apikey)
+
+    if self.dataset:
+      print "Using %s" % self.dataset_id
+
+  def handle_apikey(self, apikey=None):
+    if apikey is None:
+      apikey = raw_input("API Key: ")
+    self.apikey = apikey
+    if self.dataset_id:
+      self.dataset = Dataset(self.dataset_id, self.apikey)
+  
+  def ensure_dataset(self):
+    if not self.dataset_id:
+      self.handle_use()
+    if not self.apikey:
+      self.handle_apikey()
+
+    if self.dataset_id and self.apikey:
+      self.dataset = Dataset(self.dataset_id, self.apikey)
+      
+    if not self.dataset:
+      return False
+    else:
+      return True
+
+  def handle_sample(self, cls=None):
+    if not self.ensure_dataset():
+      print "Cannot execute command without specifying dataset and apikey"
+      return
+    if cls:
+      query = "SELECT DISTINCT ?s WHERE {{graph ?g { ?s a <%s>.}} union {?s a <%s> .}} LIMIT 10" % (self.geturi(cls), self.geturi(cls))
+    else:
+      query = "SELECT DISTINCT ?s WHERE {{graph ?g { ?s ?p [].}} union {?s ?p [] .}} LIMIT 10"
+    results = self.execute(self.dataset.select, query)
+    if results:
+      i = 0
+      self.uris = []
+      for d in results[1]:
+        print str(i) + ". " + d["s"]
+        i += 1
+        self.uris.append(d["s"])
+      if i == 0:
+        print "No results"
+
+
+  def handle_store(self, filename):
+    if not self.ensure_dataset():
+      print "Cannot execute command without specifying dataset and apikey"
+      return
+    if filename is None:
+      filename = raw_input("Filename: ")
+    
+    print "Uploading '%s'" % filename
+    
+    if not os.path.isfile(filename):
+      print "%s is not a valid filename" % filename
+      return
+    if os.path.getsize(filename) < 2000000:
+      self.execute(self.dataset.store_file, filename)
+    elif filename.endswith('.nt'):
+      content_type = 'text/turtle'
+      
+      chunk = 1
+      data = ''
+      f = open(filename, 'r')
+      for line in f:
+        data += line
+        if len(data) >= 2000000:
+          print "Storing chunk %s of %s (%s bytes)" % (chunk, filename, len(data))
+          self.execute(self.dataset.store_data, data, None, content_type)
+          chunk += 1
+          data = ''
+      f.close()    
+    else:
+      print "File is too large. Convert to ntriples for automatic chunking"
+  
+  def handle_describe(self, uri=None):
+    if not self.ensure_dataset():
+      print "Cannot execute command without specifying dataset and apikey"
+      return
+
+    if uri is None and self.pointer is not None:
+      uri = self.pointer
+    else:
+      uri = self.geturi(uri)
+    g = self.execute(self.dataset.describe, uri)
+    self.bind_prefixes(g)
+    if g:
+      print g.serialize(format="turtle")
+
+  def handle_add(self, s, p, o, changeReason="", creatorName="tshell"):
+    if not self.ensure_dataset():
+      print "Cannot execute command without specifying dataset and apikey"
+      return
+
+    s = self.getval(s)
+    p = self.getval(p)
+    o = self.getval(o)
+    cs = ChangeSet(s)
+    cs.setChangeReason(changeReason)
+    cs.setCreatorName(creatorName)
+    cs.add(p, o)
+    body = cs.serialize(format="xml")
+    uri = self.dataset.build_uri("/meta")
+    headers = {"Content-Type": "application/vnd.talis.changeset+xml"}
+    self.execute(self.client.request, uri, "POST", body, headers)
+
+  def handle_remove(self, s="-", p="-", o="-", changeReason="", creatorName="TConsole"):
+    if not self.ensure_dataset():
+      print "Cannot execute command without specifying dataset and apikey"
+      return
+
+    vars = []
+    if s == "-":
+      s = "?s"
+      vars.append(s)
+    else:
+      s = self.getval(s)
+    if p == "-":
+      p = "?p"
+      vars.append(p)
+    else:
+      p = self.getval(p)
+    if o == "-":
+      o = "?o"
+      vars.append(o)
+    else:
+      o = self.getval(o)
+    cs = BatchChangeSet()
+    cs.setChangeReason(changeReason)
+    cs.setCreatorName(creatorName)
+    if vars:
+      print "Querying data..."
+      query = "SELECT %s WHERE {%s %s %s.}" % (" ".join(vars), self.mkval(s), self.mkval(p), self.mkval(o))
+      results = self.execute(self.dataset.select, query)
+      if results:
+        for d in results[1]:
+          for h, v in d.iteritems():
+            if h == "s":
+              s = v
+            elif h == "p":
+              p = v
+            elif h == "o":
+              o = v
+          cs.remove(s, p, o)
+      else:
+        return
+    else:
+      cs.remove(s, p, o)
+
+    headers = {"Content-Type": "application/vnd.talis.changeset+xml"}
+    uri = self.dataset.build_uri("/meta")
+    graphs = list(cs.getGraphs())
+    nGraphs = len(graphs)
+    for i, g in enumerate(graphs):
+      body = g.serialize(format="xml")
+      print "Applying changeset %d/%d (%d bytes)..." % (i + 1, nGraphs, len(body))
+      self.execute(self.client.request, uri, "POST", body, headers)
+
+  def handle_prefix(self, prefix, ns):
+    self.prefixes[prefix] = self.geturi(ns)
+
+  def handle_sparql(self, *queryparts):
+    if not self.ensure_dataset():
+      print "Cannot execute command without specifying dataset and apikey"
+      return
+    query = re.sub(r"\b([-_a-zA-Z0-9]+):([-_a-zA-Z0-9]+)\b", (lambda m: " <" + self.prefixes[m.group(1)] + m.group(2) + "> "), " ".join(queryparts))
+    cmd = query.split()[0].upper()
+    if cmd == "SELECT":
+      results = self.execute(self.dataset.select, query)
+      if results:
+        self.print_select_results(results)
+    elif cmd == "ASK":
+      res = self.execute(self.dataset.ask, query)
+      if res is True:
+        print "Yes"
+      elif res is False:
+        print "No"
+    else:
+      body = self.execute(self.dataset.sparql, query, 'construct')
+      if body:
+        g = rdflib.ConjunctiveGraph()
+        self.bind_prefixes(g)
+        g.parse(StringIO.StringIO(body))
+        print g.serialize(format="turtle")
+
+  def print_select_results(self, results):
+    headers, results = results
+    if len(results) == 0:
+      print "No results"
+      return 
+    sizes = {}
+    for h in headers:
+      sizes[h] = len(h)
+    for d in results:
+      for h, v in d.iteritems():
+        sizes[h] = max(sizes[h], len(v))
+    headerparts = []
+    sep = []
+    for h in headers:
+      headerparts.append(h.center(sizes[h]))
+      sep.append("=" * sizes[h])
+    print " | ".join(headerparts)
+    print "=+=".join(sep)
+    for d in results:
+      line = []
+      for h in headers:
+        if h in d:
+          v = d[h]
+        else:
+          v = ""
+        line.append(v.encode('ascii', 'replace').ljust(sizes[h]))
+      print " | ".join(line)    
+
+  def handle_show(self, what):
+    if not self.ensure_dataset():
+      print "Cannot execute command without specifying dataset and apikey"
+      return
+    if what == "classes":
+      results = self.execute(self.dataset.select, "SELECT DISTINCT ?class WHERE {{graph ?g { [] a ?class.}} union {[] a ?class .}}")
+      if results:
+        self.uris = []
+        i = 0
+        for d in results[1]:
+          print str(i) + ". " + d["class"]
+          i += 1
+          self.uris.append(d["class"])
+        if i == 0:
+          print "No results"
+    elif what == "properties":
+      results = self.execute(self.dataset.select, "SELECT DISTINCT ?prop WHERE {{graph ?g { [] ?prop [].}} union {[] ?prop [] .}}")
+      if results:
+        self.uris = []
+        i = 0
+        for d in results[1]:
+          print str(i) + ". " + d["prop"]
+          i += 1
+          self.uris.append(d["prop"])
+        if i == 0:
+          print "No results"
+    elif what == "graphs":
+      results = self.execute(self.dataset.select, "SELECT DISTINCT ?g WHERE {GRAPH ?g { ?s ?p ?o } } LIMIT 10")
+      if results:
+        self.uris = []
+        i = 0
+        for d in results[1]:
+          print str(i) + ". " + d["g"]
+          i += 1
+          self.uris.append(d["g"])
+        if i == 0:
+          print "No results"
+    elif what == "void":
+      results = self.execute(self.dataset.select, "SELECT ?s WHERE {?s a <http://rdfs.org/ns/void#Dataset>.}")
+      if results:
+        if len(results[1]) == 1:
+          self.handle_describe("<%s>" % results[1][0]['s'])
+        else:
+          self.uris = []
+          i = 0
+          for d in results[1]:
+            print str(i) + ". " + d["s"]
+            i += 1
+            self.uris.append(d["s"])
+          if i == 0:
+            print "No results"
+    elif what == "topclasses":
+      results = self.execute(self.dataset.select, "SELECT ?class (count(?s) as ?count) WHERE {?s a ?class.} GROUP BY ?class ORDER BY desc(?count) LIMIT 5")
+      if results:
+        self.print_select_results(results)
+    elif what == "prefixes":
+      for prefix, ns in self.prefixes.iteritems():
+        print "%s: <%s>" % (prefix, ns)
+    elif what == "history":
+      i = 0
+      for words, line in self.history:
+        print "%d: %s" % (i, line)
+        i += 1
+    else:
+      print "Can't show %s" % what
+  handle_view = handle_list = handle_show
+
+  def handle_count(self, what = 'triples'):
+    if not self.ensure_dataset():
+      print "Cannot execute command without specifying dataset and apikey"
+      return
+      
+    results = None  
+    if what == 'triples':
+      results = self.execute(self.dataset.select, "SELECT (count(*) as ?count) WHERE {{graph ?g { [] ?p [].}} union {[] ?p [] .}}")
+
+    elif what == 'graphs':
+      results = self.execute(self.dataset.select, "SELECT (count(DISTINCT ?g) as ?count) WHERE {GRAPH ?g { [] ?p [] } }")
+
+    elif what == 'subjects':
+      results = self.execute(self.dataset.select, "SELECT (count(DISTINCT ?s) as ?count) WHERE {{graph ?g { ?s ?p [].}} union {?s ?p [] .}}")
+
+    elif what == 'classes':
+      results = self.execute(self.dataset.select, "SELECT (count(DISTINCT ?c) as ?count) WHERE {{graph ?g { [] a ?c.}} union {[] a ?c .}}")
+
+    elif what == 'predicates' or what == 'properties':
+      results = self.execute(self.dataset.select, "SELECT (count(DISTINCT ?p) as ?count) WHERE {{graph ?g { [] ?p [].}} union {[] ?p [] .}}")
+
+    else:
+      uri = self.geturi(what)
+      results = self.execute(self.dataset.select, "SELECT (count(DISTINCT ?s) as ?count) WHERE {{graph ?g { ?s a <%s>.}} union {?s a <%s> .}}" % (uri, uri))
+      
+    if results:
+      print "%s %s" % (results[1][0]["count"], what)
+  
+  def handle_run(self, input):
+    if input.isdigit():
+      words, line = self.history[int(input)]
+      self(words, line, False)
+    else:
+      f = open(input, "r")
+      for line in f:
+        line = line.strip()
+        if line:
+          words = splitline(line)
+          self(words, line, False)
+      f.close()
+  
+  def handle_save(self, what, file):
+    if what == "history":
+      f = open(file, "w")
+      for words, line in self.history:
+        f.write(line + "\n")
+      f.close()
+    else:
+      print "Can't save %s" % what
+
+
+
+
+  def literal(self, data):
+    return re.sub(r'"', r'\\"', self.ntencode(data))
+
+  def ntencode(self, unicode_data, encoding="ascii"):
+    #return unicode_data.encode(encoding,'ignore') # TODO: remove shortcut
+    
+    """Emulate Python 2.3's 'xmlcharrefreplace' encoding error handler."""
+    chars = []
+
+    # nothing to do about xmlchars, but replace newlines with escapes: 
+    unicode_data=unicode_data.replace("\n","\\n")
+
+    try:
+      encoded = unicode_data.encode(encoding, 'strict')
+      return encoded
+    except UnicodeError:
+
+      # Step through the unicode_data string one character at a time in
+      # order to catch unencodable characters:
+      for char in unicode_data:
+          try:
+              chars.append(char.encode(encoding, 'strict'))
+          except UnicodeError:
+              chars.append('\u%04X' % ord(char))
+      return ''.join(chars)
+  
+  def handle_reset(self):
+    if not self.ensure_dataset():
+      print "Cannot execute command without specifying dataset and apikey"
+      return
+    print "Scheduling reset job for immediate execution"
+    job_uri = self.execute(self.dataset.schedule_reset)
+    print "Reset scheduled, URI is: %s" % job_uri
+    done = False
+    while not done:
+      response, data = self.dataset.job_status(job_uri)
+      if response.status in range(200,300):
+        if data['status'] == 'scheduled':
+          print "Reset has not started yet"
+        elif data['status'] == 'running':
+          print "Reset is in progress"
+        elif data['status'] == 'failed':
+          print "Reset has failed"
+          done = True
+        elif data['status'] == 'succeeded':
+          print "Reset has completed"
+          done = True
+
+      if not done:
+        time.sleep(5)
+
+  
+  def handle_help(self):
+    print "Note: {uri} represents a URI delimited by angle brackets or a qname"
+    print "help               - show this help text"
+    print "exit               - exit the shell"
+    print "apikey             - prompt for the API key to use"
+    print "use {dataset}      - switch to using the specified dataset"
+    print "show prefixes      - show the current list of prefixes"
+    print "prefix {p} {uri}   - map prefix p to the given URI"
+    print "sample             - list 10 resources at random"
+    print "sample {uri}       - list 10 resources with the given type"
+    print "dataset {filename}   - upload the triples held in filename to the dataset's metabox"
+    print "count              - count the number of triples in the dataset"
+    print "count triples      - count the number of triples in the dataset"
+    print "count graphs       - count the number of triples in the dataset"
+    print "count subjects     - count the number of triples in the dataset"
+    print "count classes      - count the number of triples in the dataset"
+    print "count predicates   - count the number of triples in the dataset"
+    print "show classes       - show a list of classes used in the dataset"
+    print "show properties    - show a list of properties used in the dataset"
+    print "show topclasses    - show a list of the top 5 classes used in the dataset, with counts"
+    print "describe {uri}     - get the CBD of the given URI"
+    print "sparql {query}     - execute a sparql query"
+    print "search {query}     - execute a full text query"
+    print "add {s} {p} {o}    - add a triple to the dataset"
+    print "remove {s} {p} {o} - remove a triple from the dataset"
+    print "remove {s} {p}     - remove all triples with specified subject and predicate"
+    print "remove {s}         - remove all triples with specified subject"
+    print "remove {s} - {o}   - remove all triples with specified subject and object"
+    print "remove - - {o}     - remove all triples with specified object"
+
+
+def main():
+  p = optparse.OptionParser()
+  p.add_option("-a", "--apikey", action="store", dest="apikey", metavar="APIKEY", help="user APIKEY")
+  p.add_option("-d", "--dataset", action="store", dest="dataset", metavar="DATASET", help="use DATASET")
+  p.add_option("-f", "--file", action="store", dest="filename", metavar="FILENAME", help="run commands in FILENAME")
+  opts, args = p.parse_args()
+
+  d = CommandDispatcher()
+  
+  if opts.apikey:
+    d.apikey = opts.apikey
+
+  if opts.dataset:
+    d.dataset_id = opts.dataset
+    
+  if opts.filename:
+    f = open(opts.filename, "r")
+    for line in f:
+      line = line.strip()
+      if line:
+        words = splitline(line)
+        d(words, line)
+    f.close()
+  if len(args):
+    line = " ".join(args)
+    words = splitline(line)
+    d(words, line)
+
+  else:
+    while True:
+      line = raw_input(">>> ")
+      if line.lower() in ("exit", "quit"):
+        return
+      words = splitline(line)
+      d(words, line)
+
+if __name__ == "__main__":
+  main()
