@@ -331,6 +331,34 @@ You can add your own prefixes with the "prefix" command:
 By default, when pytassium starts up it attempts to fetch a list of common prefixes from http://prefix.cc. This file is cached
 in the system temp directory for future use.
 
+### Reconciling data
+pytassium provides a reconcile command which invokes the dataset's reconciliation service. 
+
+    >>> reconcile apollo
+    0. http://data.kasabi.com/dataset/nasa/spacecraft/1968-025A (score: 1.0)
+    1. http://data.kasabi.com/dataset/nasa/spacecraft/1975-066A (score: 0.9938665)
+    2. http://data.kasabi.com/dataset/nasa/spacecraft/1968-089A (score: 0.9717672)
+    3. http://data.kasabi.com/dataset/nasa/spacecraft/1969-043A (score: 0.9620834)
+    4. http://data.kasabi.com/dataset/nasa/spacecraft/1968-118A (score: 0.9620834)
+    
+Enclose multi word labels in quotes:
+
+    >>> reconcile "apollo 13"
+    0. http://data.kasabi.com/dataset/nasa/mission/apollo-13 (score: 1.0)
+    1. http://data.kasabi.com/dataset/nasa/spacecraft/1970-029C (score: 0.97858286)
+    2. http://data.kasabi.com/dataset/nasa/spacecraft/1970-029A (score: 0.83995086)
+    3. http://data.kasabi.com/dataset/nasa/spacecraft/1970-029B (score: 0.7720434)
+    4. http://data.kasabi.com/dataset/nasa/spacecraft/1973-103A (score: 0.71551764)
+
+Specify a type:
+
+    >>> reconcile apollo space:Mission
+    0. http://data.kasabi.com/dataset/nasa/mission/apollo-13 (score: 1.0)
+    1. http://data.kasabi.com/dataset/nasa/mission/apollo-12 (score: 1.0)
+    2. http://data.kasabi.com/dataset/nasa/mission/apollo-14 (score: 1.0)
+    3. http://data.kasabi.com/dataset/nasa/mission/apollo-7 (score: 1.0)
+    4. http://data.kasabi.com/dataset/nasa/mission/apollo-10 (score: 1.0)
+
 ### Resetting a dataset
 You can schedule a reset job on your dataset:
 
@@ -374,6 +402,11 @@ Sparql queries will typically need to be enclosed in quotes:
     http://data.kasabi.com/dataset/nasa/person/richardfrancisgordonjr  
     http://data.kasabi.com/dataset/nasa/person/robertfranklynovermyer  
     http://data.kasabi.com/dataset/nasa/person/edgardeanmitchellusn/scd
+
+Multi-word reconciliations will need quotes to be doubled or escaped othewise the second word will be treated as the type:
+
+    pytassium -a yourapikey -d nasa reconcile "'apollo 13'" space:Mission
+    0. http://data.kasabi.com/dataset/nasa/mission/apollo-13 (score: 1.0)
 
 A common pattern is to reset a dataset and load some fresh data into it:
 

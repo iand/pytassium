@@ -179,7 +179,7 @@ class ReconciliationApi(KasabiApi):
   def reconcile(self, query, limit=3, type_strict='any', type=None, properties=None, raw=False):
     if isinstance(query, basestring):
       # Assume this is a single label
-      param = "query=%s" % urllib.quote_plus(json.dumps(self.make_query(query, limit=limit, type_strict=type_strict, type=type, properties=properties)))
+      param = "query=%s" % urllib.quote_plus(json.dumps(self.make_query(query, limit, type_strict, type, properties)))
     elif isinstance(query, list):
       # Assume this is an array of labels
       queries = {}
@@ -203,7 +203,7 @@ class ReconciliationApi(KasabiApi):
       data = json.loads(body)
       return response, data
 
-  def make_query(self, label, limit=3, type_strict='any', type=None, properties=None):
+  def make_query(self, label, limit, type_strict, type, properties):
     query = {'query':label, 'limit':limit, 'type_strict':type_strict}
     if type:
       query['type'] = type
@@ -383,7 +383,7 @@ class Dataset:
     api = self.get_api('reconciliation')
     if not api:
       raise PytassiumError("Dataset does not have a reconciliation api")
-    return api.reconcile(query,raw)
+    return api.reconcile(query,limit, type_strict, type, properties, raw)
 
 
   def search(self, query, max=None, offset=None, sort=None, raw=False):
