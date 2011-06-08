@@ -9,5 +9,6 @@ setup(
     classifiers=['Programming Language :: Python','License :: Public Domain', 'Operating System :: OS Independent', 'Development Status :: 4 - Beta', 'Intended Audience :: Developers', 'Topic :: Software Development :: Libraries :: Python Modules', 'Topic :: Database'],
     packages =['pytassium'],
     install_requires=['rdfchangesets'],
+    scripts = ["scripts/pytassium"],
     
 )
