@@ -595,6 +595,26 @@ class CommandDispatcher(object):
     if len(self.uris) == 0:
       print "No matches"
 
+  def handle_status(self):
+    if not self.ensure_dataset():
+      print "Cannot execute command without specifying dataset and apikey"
+      return
+
+    results = self.execute(self.dataset.status)
+    if results:
+      print "Status: %s" % results['status']
+
+  def handle_attribution(self):
+    if not self.ensure_dataset():
+      print "Cannot execute command without specifying dataset and apikey"
+      return
+
+    results = self.execute(self.dataset.attribution)
+    if results:
+      if 'name' in results: print "Name: %s" % results['name']
+      if 'homepage' in results: print "Homepage: %s" % results['homepage']
+      if 'source' in results: print "Source: %s" % results['source']
+      if 'logo' in results: print "Logo: %s" % results['logo']
 
   def handle_help(self):
     print "Note: {uri} represents a URI delimited by angle brackets or a qname"
@@ -604,6 +624,8 @@ class CommandDispatcher(object):
     print "use {dataset}            - switch to using the specified dataset"
     print "show prefixes            - show the current list of prefixes"
     print "prefix {p} {uri}         - map prefix p to the given URI"
+    print "status                   - show the current publication status"
+    print "attribution              - show attribution information for the dataset"
     print "sample                   - list 10 resources at random"
     print "sample {uri}             - list 10 resources with the given type"
     print "store {filename}         - upload the triples held in filename to the dataset's metabox"
