@@ -282,6 +282,27 @@ The "show" command enables you to explore characteristics of the data:
     http://purl.org/net/schemas/space/MissionRole | 142  
     http://xmlns.com/foaf/0.1/Person              | 58   
 
+The "show void" command lists all void descriptions in the dataset, or describes it if there is only one:
+
+    >>> show void
+    @prefix dcterm: <http://purl.org/dc/terms/> .
+    @prefix void: <http://rdfs.org/ns/void#> .
+
+    <http://data.kasabi.com/dataset/nasa/> a <http://rdfs.org/ns/void#Dataset>;
+        dcterm:description """
+      Conversion of various NASA datasets into RDF, starting with the spacecraft data from the NSSDC master catalog
+      """;
+        dcterm:source <http://history.nasa.gov/SP-4029/Apollo_00a_Cover.htm>,
+            <http://nssdc.gsfc.nasa.gov/nmc/>;
+        dcterm:title "NASA Space Flight & Astronaut data";
+        void:exampleResource <http://data.kasabi.com/dataset/nasa/mission/apollo-11>,
+            <http://data.kasabi.com/dataset/nasa/person/eugeneandrewcernan>,
+            <http://data.kasabi.com/dataset/nasa/person/neilaldenarmstrong>,
+            <http://data.kasabi.com/dataset/nasa/spacecraft/1957-001B>,
+            <http://data.kasabi.com/dataset/nasa/spacecraft/1969-059A>,
+            <http://data.kasabi.com/dataset/nasa/spacecraft/1977-084A>;
+        void:sparqlEndpoint <http://api.talis.com/stores/space/services/sparql>;
+        void:uriRegexPattern "http://data.kasabi.com/dataset/nasa/.+" .
 
 ### Loading data
 You can load data from a local file with the "store" command:
