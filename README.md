@@ -304,6 +304,17 @@ The "show void" command lists all void descriptions in the dataset, or describes
         void:sparqlEndpoint <http://api.talis.com/stores/space/services/sparql>;
         void:uriRegexPattern "http://data.kasabi.com/dataset/nasa/.+" .
 
+The status and attribution commands provide more information about a dataset:
+
+    >>> status
+    Status: published
+
+    >>> attribution
+    Name: NASA
+    Homepage: http://beta.kasabi.com/dataset/nasa
+    Source: http://beta.kasabi.com
+    Logo: http://api.kasabi.com/images/kasabi-20-20.png
+
 ### Loading data
 You can load data from a local file with the "store" command:
 
