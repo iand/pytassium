@@ -331,6 +331,31 @@ You can add your own prefixes with the "prefix" command:
 By default, when pytassium starts up it attempts to fetch a list of common prefixes from http://prefix.cc. This file is cached
 in the system temp directory for future use.
 
+### Searching
+pytassium provides the "search" command for accessing a dataset's search API. All following parameters are assumed to be the search query:
+
+    >>> search apollo
+    0. Apollo 6 (score: 1.0)
+    1. ASTP-Apollo (score: 0.9938665)
+    2. Apollo 7 (score: 0.9717672)
+    3. Apollo 10 (score: 0.9620834)
+    4. Apollo 8 (score: 0.9620834)
+
+    >>> search apollo 13
+    0. Apollo 13 (score: 1.0)
+    1. Apollo 13 Lunar Module/ALSEP (score: 0.97858286)
+    2. Apollo 13 Command and Service Module (CSM) (score: 0.83995086)
+    3. Apollo 13 SIVB (score: 0.7720434)
+    4. Soyuz 13 (score: 0.71551764)
+
+    >>> search "apollo 13"
+    0. Apollo 13 (score: 1.0)
+    1. Apollo 13 Lunar Module/ALSEP (score: 0.9803725)
+    2. Apollo 13 Command and Service Module (CSM) (score: 0.84758013)
+    3. Apollo 13 SIVB (score: 0.49793136)
+    4. Apollo 13 Capsule Communicator (score: 0.41402295)
+
+
 ### Reconciling data
 pytassium provides a reconcile command which invokes the dataset's reconciliation service. 
 

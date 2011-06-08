@@ -579,34 +579,52 @@ class CommandDispatcher(object):
     if len(self.uris) == 0:
       print "No matches"
 
+  def handle_search(self, *queryparts):
+    if not self.ensure_dataset():
+      print "Cannot execute command without specifying dataset and apikey"
+      return
+
+    results = self.execute(self.dataset.search, " ".join(queryparts))
+    if results:
+      i = 0
+      self.uris = []
+      for result in results['results']:
+        print "%d. %s (score: %s)" % (i, result['title'], result['score'])
+        i += 1
+        self.uris.append(result['uri'])
+    if len(self.uris) == 0:
+      print "No matches"
+
+
   def handle_help(self):
     print "Note: {uri} represents a URI delimited by angle brackets or a qname"
-    print "help               - show this help text"
-    print "exit               - exit the shell"
-    print "apikey             - prompt for the API key to use"
-    print "use {dataset}      - switch to using the specified dataset"
-    print "show prefixes      - show the current list of prefixes"
-    print "prefix {p} {uri}   - map prefix p to the given URI"
-    print "sample             - list 10 resources at random"
-    print "sample {uri}       - list 10 resources with the given type"
-    print "store {filename}   - upload the triples held in filename to the dataset's metabox"
-    print "count              - count the number of triples in the dataset"
-    print "count triples      - count the number of triples in the dataset"
-    print "count subjects     - count the number of triples in the dataset"
-    print "count classes      - count the number of triples in the dataset"
-    print "count predicates   - count the number of triples in the dataset"
-    print "show classes       - show a list of classes used in the dataset"
-    print "show properties    - show a list of properties used in the dataset"
-    print "show topclasses    - show a list of the top 5 classes used in the dataset, with counts"
-    print "describe {uri}     - get the CBD of the given URI"
-    print "sparql {query}     - execute a sparql query"
-    print "search {query}     - execute a full text query"
-    print "add {s} {p} {o}    - add a triple to the dataset"
-    print "remove {s} {p} {o} - remove a triple from the dataset"
-    print "remove {s} {p}     - remove all triples with specified subject and predicate"
-    print "remove {s}         - remove all triples with specified subject"
-    print "remove {s} - {o}   - remove all triples with specified subject and object"
-    print "remove - - {o}     - remove all triples with specified object"
+    print "help                     - show this help text"
+    print "exit                     - exit the shell"
+    print "apikey                   - prompt for the API key to use"
+    print "use {dataset}            - switch to using the specified dataset"
+    print "show prefixes            - show the current list of prefixes"
+    print "prefix {p} {uri}         - map prefix p to the given URI"
+    print "sample                   - list 10 resources at random"
+    print "sample {uri}             - list 10 resources with the given type"
+    print "store {filename}         - upload the triples held in filename to the dataset's metabox"
+    print "count                    - count the number of triples in the dataset"
+    print "count triples            - count the number of triples in the dataset"
+    print "count subjects           - count the number of triples in the dataset"
+    print "count classes            - count the number of triples in the dataset"
+    print "count predicates         - count the number of triples in the dataset"
+    print "show classes             - show a list of classes used in the dataset"
+    print "show properties          - show a list of properties used in the dataset"
+    print "show topclasses          - show a list of the top 5 classes used in the dataset, with counts"
+    print "describe {uri}           - get the CBD of the given URI"
+    print "sparql {query}           - execute a sparql query"
+    print "search {query}           - execute a full text query"
+    print "reconcile {label} {type} - reconcile label with type"
+    print "add {s} {p} {o}          - add a triple to the dataset"
+    print "remove {s} {p} {o}       - remove a triple from the dataset"
+    print "remove {s} {p}           - remove all triples with specified subject and predicate"
+    print "remove {s}               - remove all triples with specified subject"
+    print "remove {s} - {o}        - remove all triples with specified subject and object"
+    print "remove - - {o}           - remove all triples with specified object"
 
 
 def main():
