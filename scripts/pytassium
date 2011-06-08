@@ -483,6 +483,27 @@ class CommandDispatcher(object):
       for words, line in self.history:
         print "%d: %s" % (i, line)
         i += 1
+    elif what == "schemas":
+      schemas = []
+      results = self.execute(self.dataset.select, "SELECT DISTINCT ?u WHERE {{graph ?g { [] a ?u.}} union {[] a ?u .}}")
+      if results:
+        for d in results[1]:
+          m = re.search(r'^(http.+?[#/])[^#/]+$', str(d['u']))
+          if m:
+            if m.group(1) not in schemas:
+              schemas.append(m.group(1))
+
+      results = self.execute(self.dataset.select, "SELECT DISTINCT ?u WHERE {{graph ?g { [] ?u [].}} union {[] ?u [] .}}")
+      if results:
+        for d in results[1]:
+          m = re.search(r'^(http.+?[#/])[^#/]+$', str(d['u']))
+          if m:
+            if m.group(1) not in schemas:
+              schemas.append(m.group(1))
+
+      for schema in schemas:
+        print schema
+
     else:
       print "Can't show %s" % what
   handle_view = handle_list = handle_show
@@ -636,6 +657,7 @@ class CommandDispatcher(object):
     print "count predicates         - count the number of triples in the dataset"
     print "show classes             - show a list of classes used in the dataset"
     print "show properties          - show a list of properties used in the dataset"
+    print "show schemas             - show a list of the schemas used in the dataset"
     print "show topclasses          - show a list of the top 5 classes used in the dataset, with counts"
     print "describe {uri}           - get the CBD of the given URI"
     print "sparql {query}           - execute a sparql query"
