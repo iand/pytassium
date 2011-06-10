@@ -52,6 +52,9 @@ class KasabiApi:
 
 
 class AttributionApi(KasabiApi):
+  def __init__(self, uri, apikey, client=None):
+    KasabiApi.__init__(self, uri, apikey, client)
+    
   def get(self, raw=False):
     response, body = self.client.request("%s?output=json"%self.uri, "GET",headers={"accept" : "application/json", APIKEY_HEADER:self.apikey})
     if raw or response.status not in range(200, 300):
@@ -61,6 +64,9 @@ class AttributionApi(KasabiApi):
       return response, data
     
 class StatusApi(KasabiApi):
+  def __init__(self, uri, apikey, client=None):
+    KasabiApi.__init__(self, uri, apikey, client)
+
   def get(self, raw=False):
     response, body = self.client.request("%s?output=json"%self.uri, "GET",headers={"accept" : "application/json", APIKEY_HEADER:self.apikey})
     if raw or response.status not in range(200, 300):
@@ -70,6 +76,9 @@ class StatusApi(KasabiApi):
       return response, data
 
 class SparqlApi(KasabiApi):
+  def __init__(self, uri, apikey, client=None):
+    KasabiApi.__init__(self, uri, apikey, client)
+
   def sparql(self, query, media_type):
     return self.client.request("%s?query=%s" % (self.uri, urllib.quote_plus(query)), "GET", headers={"accept" : media_type, APIKEY_HEADER:self.apikey})
 
@@ -123,6 +132,9 @@ class SparqlApi(KasabiApi):
     return response, body
   
 class LookupApi(KasabiApi):
+  def __init__(self, uri, apikey, client=None):
+    KasabiApi.__init__(self, uri, apikey, client)
+
   def lookup(self, uri, raw = False):
     (response, body) = self.client.request("%s?about=%s" % (self.uri, urllib.quote_plus(uri)), "GET",headers={"accept" : "text/turtle", APIKEY_HEADER:self.apikey})
     if raw:
@@ -131,6 +143,9 @@ class LookupApi(KasabiApi):
       return response_body_as_graph(response, body)
 
 class UpdateApi(KasabiApi):
+  def __init__(self, uri, apikey, client=None):
+    KasabiApi.__init__(self, uri, apikey, client)
+
   def store_data(self, data, graph_uri=None, media_type='text/turtle'):
     """Store some RDF in a graph associated with this dataset."""    
     if graph_uri is not None:
@@ -176,6 +191,9 @@ class UpdateApi(KasabiApi):
     return self.client.request(self.uri, "POST", body=data, headers={"accept" : "*/*", 'content-type':'application/vnd.talis.changeset+xml', APIKEY_HEADER:self.apikey})
 
 class ReconciliationApi(KasabiApi):
+  def __init__(self, uri, apikey, client=None):
+    KasabiApi.__init__(self, uri, apikey, client)
+
   def reconcile(self, query, limit=3, type_strict='any', type=None, properties=None, raw=False):
     if isinstance(query, basestring):
       # Assume this is a single label
@@ -225,6 +243,9 @@ class ReconciliationApi(KasabiApi):
     return pfilter
 
 class SearchApi(KasabiApi):
+  def __init__(self, uri, apikey, client=None):
+    KasabiApi.__init__(self, uri, apikey, client)
+
   def search(self, query, max=None, offset=None, sort=None, raw=False):
     params = [ "query=%s" % urllib.quote_plus(query)]
     if max:
@@ -252,6 +273,9 @@ class SearchApi(KasabiApi):
       return response, data
 
 class JobsApi(KasabiApi):
+  def __init__(self, uri, apikey, client=None):
+    KasabiApi.__init__(self, uri, apikey, client)
+
   def schedule_job(self, type, time = None, raw=False):
     if time is None:
       time = dt.datetime.utcnow()
@@ -276,22 +300,24 @@ class JobsApi(KasabiApi):
       return response, data
 
 class AugmentationApi(KasabiApi):
+  def __init__(self, uri, apikey, client=None):
+    KasabiApi.__init__(self, uri, apikey, client)
+
   pass
 
   
   
 class Dataset:
-  api_map = {}
   service_types = {
-    "http://rdfs.org/ns/void#sparqlEndpoint":("sparql",SparqlApi),
-    "http://rdfs.org/ns/void#uriLookupEndpoint": ("lookup",LookupApi),
-    "http://labs.kasabi.com/ns/services#searchEndpoint": ("search",SearchApi),
-    "http://labs.kasabi.com/ns/services#augmentationEndpoint": ("augmentation",AugmentationApi),
-    "http://labs.kasabi.com/ns/services#reconciliationEndpoint": ("reconciliation",ReconciliationApi),
-    "http://labs.kasabi.com/ns/services#storeEndpoint": ("update",UpdateApi),
-    "http://labs.kasabi.com/ns/services#statusEndpoint": ("status",StatusApi),
-    "http://labs.kasabi.com/ns/services#jobsEndpoint": ("jobs",JobsApi),
-    "http://labs.kasabi.com/ns/services#attributionEndpoint": ("attribution",AttributionApi),
+    "http://rdfs.org/ns/void#sparqlEndpoint":("sparql",'SparqlApi'),
+    "http://rdfs.org/ns/void#uriLookupEndpoint": ("lookup",'LookupApi'),
+    "http://labs.kasabi.com/ns/services#searchEndpoint": ("search",'SearchApi'),
+    "http://labs.kasabi.com/ns/services#augmentationEndpoint": ("augmentation",'AugmentationApi'),
+    "http://labs.kasabi.com/ns/services#reconciliationEndpoint": ("reconciliation",'ReconciliationApi'),
+    "http://labs.kasabi.com/ns/services#storeEndpoint": ("update",'UpdateApi'),
+    "http://labs.kasabi.com/ns/services#statusEndpoint": ("status",'StatusApi'),
+    "http://labs.kasabi.com/ns/services#jobsEndpoint": ("jobs",'JobsApi'),
+    "http://labs.kasabi.com/ns/services#attributionEndpoint": ("attribution",'AttributionApi'),
   }
 
   def __init__(self, uri, apikey, client=None):
@@ -303,7 +329,8 @@ class Dataset:
     
     self.apikey = apikey
     self.meta = None
-    
+    self.api_map = {}
+
     if uri.startswith("http://data.kasabi.com/dataset/"):
       self.uid = uri[31:]
       self.uri = uri
@@ -420,7 +447,7 @@ class Dataset:
       if str(p) in self.service_types:
         short_name = self.service_types[str(p)][0]
         clazz = self.service_types[str(p)][1]
-        api = clazz(str(o), self.apikey, self.client)
+        api = globals()[clazz](str(o), self.apikey, self.client)
         if short_name not in self.api_map:
           self.api_map[short_name] = [api]
         else:

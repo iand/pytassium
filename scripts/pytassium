@@ -204,11 +204,16 @@ class CommandDispatcher(object):
     if dataset is None:
       dataset = raw_input("Dataset: ")
     self.dataset_id = dataset
+    print self.dataset_id 
     if self.dataset_id and self.apikey:
       self.dataset = Dataset(self.dataset_id, self.apikey)
 
+      print self.dataset
     if self.dataset:
-      print "Using %s" % self.dataset_id
+      print "Using %s" % self.dataset.uri
+
+    print self.dataset.get_api('sparql')
+    print self.dataset.get_api('sparql').uri
 
   def handle_apikey(self, apikey=None):
     if apikey is None:
