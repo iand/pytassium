@@ -21,6 +21,13 @@ import StringIO
 import optparse
 import json
 import tempfile
+try:
+  import pygments
+  import pygments.formatters
+  import pygments.lexers
+except ImportError:
+  pygments = None
+
 
 def splitline(line):
   words = []
@@ -294,8 +301,8 @@ class CommandDispatcher(object):
     g = self.execute(self.dataset.describe, uri)
     self.bind_prefixes(g)
     if g:
-      print g.serialize(format="turtle")
-
+      self.print_graph(g)
+        
   def handle_add(self, s, p, o, changeReason="", creatorName="tshell"):
     if not self.ensure_dataset():
       print "Cannot execute command without specifying dataset and apikey"
@@ -390,7 +397,7 @@ class CommandDispatcher(object):
         g = rdflib.ConjunctiveGraph()
         self.bind_prefixes(g)
         g.parse(StringIO.StringIO(body))
-        print g.serialize(format="turtle")
+        self.print_graph(g)
 
   def print_select_results(self, results):
     headers, results = results
@@ -636,6 +643,16 @@ class CommandDispatcher(object):
       if 'homepage' in results: print "Homepage: %s" % results['homepage']
       if 'source' in results: print "Source: %s" % results['source']
       if 'logo' in results: print "Logo: %s" % results['logo']
+
+  def print_graph(self, ttl):
+    ttl = g.serialize(format="turtle")
+    if pygments is not None:
+      lexer = pygments.lexers.get_lexer_by_name("turtle")
+      formatter = pygments.formatters.get_formatter_by_name("console")
+      print pygments.highlight(ttl, lexer, formatter)
+    else:
+      print ttl
+    
 
   def handle_help(self):
     print "Note: {uri} represents a URI delimited by angle brackets or a qname"
