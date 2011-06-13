@@ -699,7 +699,9 @@ def main():
   
   if opts.apikey:
     d.apikey = opts.apikey
-
+  elif 'KASABI_API_KEY' in os.environ:
+    d.apikey = os.environ['KASABI_API_KEY']
+    
   if opts.dataset:
     d.dataset_id = opts.dataset
     
