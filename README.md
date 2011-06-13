@@ -166,6 +166,12 @@ You can also specify the dataset and apikey using the -d and -a command line opt
 
     ./pytassium -d nasa -a yourapikey
 
+Alternatively you can specify the default apikey to use by setting the KASABI_API_KEY environment variable. In Linux:
+
+    export KASABI_API_KEY=yourapikey
+    pytassium -d nasa
+    
+The -a parameter will override the environment variable.
 
 To stop using pytassium use the "exit" command:
 
