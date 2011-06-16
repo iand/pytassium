@@ -440,9 +440,8 @@ class Dataset:
   def fetch_meta(self):
     response, body = self.client.request("%s.ttl"%self.uri, "GET",headers={"accept" : "text/turtle", APIKEY_HEADER:self.apikey})
     response, self.meta = response_body_as_graph(response, body, format="n3")
-    # Workaround for a bug in the beta. remove next line when fixed
-    dataset_uri = re.sub('data.kasabi.com', 'beta.kasabi.com', self.uri)
-    t = self.meta.triples((URIRef(dataset_uri),None,None))
+
+    t = self.meta.triples((URIRef(self.uri),None,None))
     for (s,p,o) in t:
       if str(p) in self.service_types:
         short_name = self.service_types[str(p)][0]

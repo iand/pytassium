@@ -1,7 +1,7 @@
 from setuptools import setup
 setup(
     name = 'pytassium',
-    version = '0.2.0',
+    version = '0.2.1',
     description = 'A Python library for working with Kasabi.com APIs',
     author='Ian Davis',
     author_email='nospam@iandavis.com',
