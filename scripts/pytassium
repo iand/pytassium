@@ -644,7 +644,7 @@ class CommandDispatcher(object):
       if 'source' in results: print "Source: %s" % results['source']
       if 'logo' in results: print "Logo: %s" % results['logo']
 
-  def print_graph(self, ttl):
+  def print_graph(self, g):
     ttl = g.serialize(format="turtle")
     if pygments is not None:
       lexer = pygments.lexers.get_lexer_by_name("turtle")
