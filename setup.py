@@ -1,14 +1,14 @@
 from setuptools import setup
 setup(
     name = 'pytassium',
-    version = '0.2.3',
+    version = '0.2.4',
     description = 'A Python library for working with Kasabi.com APIs',
     author='Ian Davis',
     author_email='nospam@iandavis.com',
     url='https://github.com/iand/pytassium',
     classifiers=['Programming Language :: Python','License :: Public Domain', 'Operating System :: OS Independent', 'Development Status :: 4 - Beta', 'Intended Audience :: Developers', 'Topic :: Software Development :: Libraries :: Python Modules', 'Topic :: Database'],
     packages =['pytassium'],
-    install_requires=['rdfchangesets', 'TurtleLexer', 'httplib2', 'rdflib'],
+    install_requires=['rdfchangesets', 'TurtleLexer', 'httplib2', 'rdflib>=3.1.0'],
     scripts = ["scripts/pytassium"],
     
 )
