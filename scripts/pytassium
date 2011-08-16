@@ -18,6 +18,8 @@ from pytassium import Dataset
 from rdfchangesets import ChangeSet, BatchChangeSet
 import traceback
 import StringIO
+from rdflib.parser import StringInputSource
+
 import optparse
 import json
 import tempfile
@@ -286,6 +288,8 @@ class CommandDispatcher(object):
           chunk += 1
           data = ''
       f.close()    
+      if len(data) >= 0:
+        self.execute(self.dataset.store_data, data, None, content_type)
     else:
       print "File is too large. Convert to ntriples for automatic chunking"
   
@@ -654,6 +658,8 @@ class CommandDispatcher(object):
       print ttl
     
 
+
+
   def handle_help(self):
     print "Note: {uri} represents a URI delimited by angle brackets or a qname"
     print "help                     - show this help text"
@@ -687,6 +693,7 @@ class CommandDispatcher(object):
     print "remove {s} - {o}        - remove all triples with specified subject and object"
     print "remove - - {o}           - remove all triples with specified object"
 
+ 
 
 def main():
   p = optparse.OptionParser()
