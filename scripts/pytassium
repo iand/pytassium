@@ -9,6 +9,7 @@
 import os
 import os.path
 import time
+import math
 import readline
 import re
 import getpass
@@ -279,7 +280,7 @@ class CommandDispatcher(object):
     elif filename.endswith('.nt'):
       content_type = 'text/turtle'
       
-      expected_chunks = os.path.getsize(filename) / chunk_size
+      expected_chunks = math.ceil(os.path.getsize(filename) / chunk_size)
 
       chunk = 1
       linecount = 0
