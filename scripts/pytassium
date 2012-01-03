@@ -269,26 +269,31 @@ class CommandDispatcher(object):
     
     print "Uploading '%s'" % filename
     
+    chunk_size = 2000000
+
     if not os.path.isfile(filename):
       print "%s is not a valid filename" % filename
       return
-    if os.path.getsize(filename) < 2000000:
+    if os.path.getsize(filename) < chunk_size:
       self.execute(self.dataset.store_file, filename)
     elif filename.endswith('.nt'):
       content_type = 'text/turtle'
       
+      expected_chunks = os.path.getsize(filename) / chunk_size
+
       chunk = 1
       data = ''
       f = open(filename, 'r')
       for line in f:
         data += line
-        if len(data) >= 2000000:
-          print "Storing chunk %s of %s (%s bytes)" % (chunk, filename, len(data))
+        if len(data) >= chunk_size:
+          print "Storing chunk %s of %s (%s bytes), estimate %s remaining chunks" % (chunk, filename, len(data), expected_chunks - chunk)
           self.execute(self.dataset.store_data, data, None, content_type)
           chunk += 1
           data = ''
       f.close()    
       if len(data) >= 0:
+        print "Storing final chunk %s of %s (%s bytes)" % (chunk, filename, len(data))
         self.execute(self.dataset.store_data, data, None, content_type)
     else:
       print "File is too large. Convert to ntriples for automatic chunking"
