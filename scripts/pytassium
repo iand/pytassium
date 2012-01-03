@@ -282,18 +282,20 @@ class CommandDispatcher(object):
       expected_chunks = os.path.getsize(filename) / chunk_size
 
       chunk = 1
+      linecount = 0
       data = ''
       f = open(filename, 'r')
       for line in f:
+        linecount += 1
         data += line
         if len(data) >= chunk_size:
-          print "Storing chunk %s of %s (%s bytes), estimate %s remaining chunks" % (chunk, filename, len(data), expected_chunks - chunk)
+          print "Storing chunk %s of %s (%s bytes), %s lines done, estimate %s remaining chunks" % (chunk, filename, len(data), linecount, expected_chunks - chunk)
           self.execute(self.dataset.store_data, data, None, content_type)
           chunk += 1
           data = ''
       f.close()    
       if len(data) >= 0:
-        print "Storing final chunk %s of %s (%s bytes)" % (chunk, filename, len(data))
+        print "Storing final chunk %s of %s (%s bytes), %s total lines sent" % (chunk, filename, len(data), linecount)
         self.execute(self.dataset.store_data, data, None, content_type)
     else:
       print "File is too large. Convert to ntriples for automatic chunking"
