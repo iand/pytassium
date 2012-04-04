@@ -5,7 +5,7 @@
 # [http://creativecommons.org/licenses/publicdomain](http://creativecommons.org/licenses/publicdomain) 
 # or send a letter to Creative Commons, 559 Nathan Abbott Way, Stanford, California 94305, USA.
 
-__version__ = '0.2.8'
+__version__ = '0.2.9'
 __all__ = ["Dataset", "PytassiumError"]
 
 import httplib2
