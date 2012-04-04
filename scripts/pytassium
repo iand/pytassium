@@ -591,12 +591,17 @@ class CommandDispatcher(object):
       if response.status in range(200,300):
         if data['status'] == 'scheduled':
           print "Reset has not started yet"
+        elif data['jobStatus'] == 'pending':
+          print "Reset has not started yet"
         elif data['status'] == 'running':
           print "Reset is in progress"
         elif data['status'] == 'failed':
           print "Reset has failed"
           done = True
         elif data['status'] == 'succeeded':
+          print "Reset has completed"
+          done = True
+        elif data['jobStatus'] == 'applied':
           print "Reset has completed"
           done = True
 
